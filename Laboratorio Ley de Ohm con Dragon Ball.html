@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kamehameha Physics Lab | Z-Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Bangers&family=Orbitron:wght@400;900&family=Rajdhani:wght@500;700&display=swap');
+
+        body {
+            background-color: #050508;
+            color: #fff;
+            font-family: 'Rajdhani', sans-serif;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .font-dbz { font-family: 'Bangers', cursive; letter-spacing: 2px; }
+
+        .glass-panel {
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            border: 2px solid #ff8a00;
+            border-radius: 0.75rem;
+            box-shadow: 0 0 15px rgba(255, 138, 0, 0.2);
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            background: #1a1a1a;
+            border-radius: 5px;
+            border: 1px solid #444;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #ff8a00;
+            cursor: pointer;
+            box-shadow: 0 0 8px #ff8a00;
+            border: 2px solid white;
+        }
+
+        .color-select {
+            background: #1a1a2e;
+            color: #fff;
+            border: 1px solid #4e4eff;
+            border-radius: 4px;
+            font-size: 11px;
+            padding: 4px;
+            width: 100%;
+            cursor: pointer;
+            outline: none;
+            font-weight: bold;
+        }
+        
+        option {
+            background-color: #1a1a2e;
+            color: white;
+            padding: 2px;
+        }
+
+        .resistor-body {
+            width: 110px;
+            height: 35px;
+            background: #d1b48c;
+            border-radius: 20px;
+            position: relative;
+            display: flex;
+            justify-content: space-evenly;
+            align-items: center;
+            padding: 0 10px;
+            margin: 10px auto;
+            border: 2px solid rgba(0,0,0,0.3);
+            box-shadow: inset 0 0 8px rgba(0,0,0,0.3);
+        }
+        .visual-band {
+            width: 8px;
+            height: 100%;
+            transition: background-color 0.3s ease;
+        }
+
+        .color-tile {
+            width: 100%;
+            height: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            font-weight: bold;
+        }
+
+        .goku-img {
+            position: fixed;
+            bottom: -10px;
+            left: -30px;
+            width: 420px;
+            filter: drop-shadow(0 0-25px rgba(0, 162, 255, 0.7));
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        .scouter-readout {
+            font-family: 'monospace';
+            background: rgba(0, 20, 40, 0.4);
+            padding: 6px;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .vegeta-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.92);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            padding: 20px;
+        }
+
+        .vegeta-card {
+            background: linear-gradient(135deg, #0f0f1a 0%, #16213e 100%);
+            border: 4px solid #4e4eff;
+            border-radius: 2rem;
+            max-width: 1000px;
+            width: 95%;
+            display: flex;
+            flex-direction: row;
+            overflow: hidden;
+            box-shadow: 0 0 60px rgba(78, 78, 255, 0.4);
+        }
+
+        /* ESTILOS DE LA EXPLOSIÓN */
+        #explosion-modal {
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle, #ff0000 0%, #000 100%);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            padding: 20px;
+            text-align: center;
+            animation: shake 0.2s infinite;
+        }
+
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            50% { transform: translate(-1px, -2px) rotate(-1deg); }
+            100% { transform: translate(1px, 1px) rotate(0deg); }
+        }
+
+        @media (max-width: 850px) {
+            .vegeta-card { flex-direction: column; max-height: 90vh; overflow-y: auto; }
+            .goku-img { width: 280px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container" class="absolute inset-0"></div>
+
+    <img src="https://giffiles.alphacoders.com/105/105478.gif" alt="Goku Kamehameha" class="goku-img">
+
+    <div id="ui-layer" class="relative z-10 p-4 h-screen flex flex-col justify-between pointer-events-none">
+        
+        <div class="flex justify-between items-start relative">
+            <div class="glass-panel p-2.5 pointer-events-auto w-48">
+                <h1 class="text-lg font-dbz text-orange-500 italic">KAME-LAB</h1>
+                <div class="mt-1.5 space-y-1">
+                    <div class="scouter-readout text-[8px] border-orange-500/50 text-orange-400">
+                        VOLTAJE (V): <span id="val-v" class="float-right font-bold text-xs">200</span>
+                    </div>
+                    <div class="scouter-readout text-[8px] border-blue-500/50 text-blue-400">
+                        RESISTENCIA (Ω): <span id="val-r" class="float-right font-bold text-xs">100</span>
+                    </div>
+                    <div class="scouter-readout text-[8px] border-cyan-400 text-cyan-400 bg-cyan-950/20">
+                        INTENSIDAD (I): <span id="val-i" class="float-right font-bold text-xs">2.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KI MONITOR UPDATED -->
+            <div class="absolute left-1/2 -translate-x-1/2 pointer-events-auto hidden md:block">
+                <div class="glass-panel p-3 text-center w-64">
+                    <p id="ki-monitor-title" class="font-dbz text-sm text-yellow-400">KI LEVEL MONITOR</p>
+                    <div class="w-full h-1.5 bg-gray-800 rounded-full mt-1 overflow-hidden border border-white/10">
+                        <div id="ki-bar" class="h-full bg-cyan-400 shadow-[0_0_8px_#00ffff] transition-all duration-300"></div>
+                    </div>
+                    <div class="mt-1 text-center">
+                        <p id="ki-status-text" class="text-[10px] font-bold uppercase text-cyan-400 animate-pulse mb-1">KI ESTABLE</p>
+                        <p id="ki-physics-explanation" class="text-[8px] leading-tight text-gray-400 italic px-2"></p>
+                    </div>
+                </div>
+            </div>
+            <div class="w-48"></div>
+        </div>
+
+        <div class="flex justify-end mb-2">
+            <div class="glass-panel p-4 w-72 pointer-events-auto">
+                <h2 class="font-dbz text-lg text-orange-400 mb-2 text-center border-b border-orange-400/30 pb-1 uppercase">Entrenamiento Ohm</h2>
+                
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex flex-col">
+                            <label class="text-xs font-bold text-orange-400 uppercase tracking-wide">Voltaje (V)</label>
+                            <span class="text-[9px] text-orange-300/80 italic">"¡Presión del Ki!"</span>
+                        </div>
+                        <input type="range" id="v-slider" min="10" max="600" value="200" class="mt-1">
+                    </div>
+                    
+                    <div class="border-t border-white/10 pt-2">
+                        <div class="flex flex-col">
+                            <label class="text-xs font-bold text-blue-400 uppercase tracking-wide">Resistencia (Ω)</label>
+                            <span class="text-[9px] text-blue-300/80 italic">"¡Defensa que frena!"</span>
+                        </div>
+                        
+                        <div class="resistor-body">
+                            <div id="vband-1" class="visual-band"></div>
+                            <div id="vband-2" class="visual-band"></div>
+                            <div id="vband-3" class="visual-band"></div>
+                            <div class="visual-band bg-[#FFD700] ml-3 opacity-50"></div>
+                        </div>
+
+                        <div class="space-y-1.5 mt-2">
+                            <div class="flex items-center gap-2">
+                                <span class="text-[9px] text-gray-400 font-bold w-16">BANDA 1:</span>
+                                <select id="sel-b1" class="color-select" onchange="updateBandValues()"></select>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-[9px] text-gray-400 font-bold w-16">BANDA 2:</span>
+                                <select id="sel-b2" class="color-select" onchange="updateBandValues()"></select>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-[9px] text-gray-400 font-bold w-16">MULT.:</span>
+                                <select id="sel-b3" class="color-select" onchange="updateBandValues()"></select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 flex flex-col gap-2">
+                    <button onclick="showVegeta()" class="bg-blue-700 hover:bg-blue-600 py-2.5 rounded-lg font-dbz text-base shadow-[0_4px_0_rgb(29,78,216)] active:shadow-none active:translate-y-1 transition-all text-white uppercase tracking-wider">¡ANALIZAR CON VEGETA!</button>
+                    <button onclick="resetLab()" class="bg-red-600 hover:bg-red-500 py-1.5 rounded-lg font-bold text-[10px] text-white uppercase tracking-tighter shadow-[0_2px_10px_rgba(220,38,38,0.5)] transition-all transform active:scale-95">Reiniciar Simulación</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vegeta Modal -->
+    <div id="vegeta-modal" class="vegeta-overlay">
+        <div class="vegeta-card">
+            <div class="w-full md:w-1/3 bg-black/40 flex items-center justify-center border-r border-blue-500/30 p-4">
+                <img src="https://i.pinimg.com/474x/00/4f/1a/004f1a11bb6902e6332080894eeea217.jpg" alt="Vegeta" class="max-h-[500px] w-full object-cover rounded-xl shadow-lg border-2 border-blue-400/50">
+            </div>
+            <div class="p-6 w-full md:w-2/3 flex flex-col overflow-y-auto max-h-[90vh]">
+                <div class="flex justify-between items-center border-b-2 border-blue-400 pb-2 mb-4">
+                    <h2 class="text-3xl font-dbz text-blue-400 uppercase">Reporte del Príncipe Saiyajin</h2>
+                    <span class="text-xs font-mono text-blue-300 animate-pulse">KI-LINK ESTABLISHED</span>
+                </div>
+                
+                <div class="space-y-4">
+                    <p id="vegeta-speech" class="text-base italic leading-relaxed text-gray-100 bg-blue-900/20 p-4 rounded-lg border-l-4 border-yellow-400"></p>
+                    
+                    <div class="grid grid-cols-1 gap-2">
+                        <div class="bg-black/30 p-3 rounded border-l-2 border-orange-400 text-[11px]">
+                            <span class="text-orange-400 font-bold uppercase">Voltaje (V):</span> Es la presión que empuja las cargas. ¡Sin ella, tu ataque no tiene empuje!
+                        </div>
+                        <div class="bg-black/30 p-3 rounded border-l-2 border-blue-400 text-[11px]">
+                            <span class="text-blue-400 font-bold uppercase">Resistencia (Ω):</span> Es la dificultad que encuentra la energía. ¡Es como pelear con gravedad de 100G!
+                        </div>
+                        <div class="bg-black/30 p-3 rounded border-l-2 border-green-400 text-[11px]">
+                            <span class="text-green-400 font-bold uppercase">Intensidad (I):</span> El flujo real de energía (Amperios). ¡Es el grosor de tu Kamehameha!
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-center gap-6 bg-blue-900/40 p-4 rounded-xl border border-blue-400 shadow-inner">
+                        <div class="text-center">
+                            <p class="text-[10px] uppercase text-gray-400 mb-1">Ley de Ohm</p>
+                            <p class="text-3xl font-black text-white">I = <span class="text-orange-400">V</span> / <span class="text-blue-400">R</span></p>
+                        </div>
+                        <div class="h-12 w-px bg-blue-400/30"></div>
+                        <div class="text-left text-[11px] space-y-1">
+                            <p>V: <span id="res-v" class="text-orange-400 font-bold">0</span> Volts</p>
+                            <p>R: <span id="res-r" class="text-blue-400 font-bold">0</span> Ohms</p>
+                            <p class="pt-1 border-t border-white/10 font-bold">I: <span id="res-i" class="text-green-400">0</span> Amps</p>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-white/10 pt-4">
+                        <h3 class="font-dbz text-yellow-400 text-sm mb-2 uppercase">Manual de Bandas (Código de Colores)</h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
+                            <div class="bg-white/5 p-2 rounded border border-white/10">
+                                <p class="text-[10px] text-blue-300 font-bold uppercase">Banda 1 (1ª Cifra)</p>
+                                <p class="text-[9px] text-gray-300">Representa la primera unidad del valor. Si es marrón, el valor empieza con '1'.</p>
+                            </div>
+                            <div class="bg-white/5 p-2 rounded border border-white/10">
+                                <p class="text-[10px] text-blue-300 font-bold uppercase">Banda 2 (2ª Cifra)</p>
+                                <p class="text-[9px] text-gray-300">Representa la segunda unidad. Junto a la banda 1, forman un número de dos dígitos.</p>
+                            </div>
+                            <div class="bg-white/5 p-2 rounded border border-white/10">
+                                <p class="text-[10px] text-yellow-400 font-bold uppercase">Banda 3 (Multiplicador)</p>
+                                <p class="text-[9px] text-gray-300">Indica por cuánto multiplicar las dos cifras ($10^n$). ¡Define la magnitud del Ki!</p>
+                            </div>
+                        </div>
+
+                        <p class="text-[10px] text-gray-400 mb-2 italic">Valores por color (0-9):</p>
+                        <div id="color-grid" class="grid grid-cols-5 md:grid-cols-10 gap-1"></div>
+                    </div>
+                </div>
+                
+                <button onclick="hideVegeta()" class="mt-6 bg-red-600 hover:bg-red-500 py-3 rounded-lg font-dbz text-xl uppercase transition-all">Cerrar Comunicación</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PANTALLA DE DESTRUCCIÓN DEL MUNDO -->
+    <div id="explosion-modal">
+        <h1 class="text-6xl md:text-8xl font-dbz text-white mb-6 drop-shadow-[0_0_20px_rgba(255,255,255,1)]">HAS DESTRUIDO EL MUNDO</h1>
+        <div class="bg-black/80 p-8 rounded-2xl border-4 border-white max-w-2xl text-left space-y-6">
+            <h2 class="text-yellow-400 font-bold text-2xl uppercase italic">⚠️ EXPLICACIÓN DEL DESASTRE FÍSICO:</h2>
+            <p class="text-gray-100 text-lg">Al aplicar el <span class="text-orange-500 font-bold">Voltaje Máximo (600V)</span> sobre una <span class="text-blue-500 font-bold">Resistencia Mínima (1Ω)</span>, has generado una corriente infinita de <span class="text-red-500 font-bold">600 AMPERIOS</span>.</p>
+            
+            <div class="space-y-4 text-sm text-gray-300">
+                <p><strong class="text-white uppercase">¿Cómo se quema todo?</strong> El flujo de electrones es tan masivo que los átomos del material chocan violentamente entre sí. Esto libera una cantidad de calor incontrolable (Efecto Joule).</p>
+                <p><strong class="text-white uppercase">La Explosión:</strong> No hay resistencia que frene la presión del voltaje. Los cables se funden instantáneamente, el aire se ioniza y el sistema colapsa en una explosión térmica que ha vaporizado el planeta.</p>
+            </div>
+        </div>
+        <button onclick="resetLab()" class="mt-10 bg-white text-red-600 px-12 py-4 rounded-full font-dbz text-4xl hover:scale-110 transition-transform shadow-[0_0_30px_white]">REINICIAR UNIVERSO</button>
+    </div>
+
+    <script>
+        let scene, camera, renderer, clock;
+        let particles = [];
+        let beamCore, beamOuter;
+        let energyGroup; 
+        let voltage = 200;
+        let b1 = 1, b2 = 0, b3 = 1; 
+        let resistance = 100;
+
+        const colorMap = [
+            { n: 'Negro', v: 0, hex: '#000000', text: '#ffffff' },
+            { n: 'Marrón', v: 1, hex: '#8B4513', text: '#ffffff' },
+            { n: 'Rojo', v: 2, hex: '#ff0000', text: '#ffffff' },
+            { n: 'Naranja', v: 3, hex: '#ff8a00', text: '#000000' },
+            { n: 'Amarillo', v: 4, hex: '#ffff00', text: '#000000' },
+            { n: 'Verde', v: 5, hex: '#00ff00', text: '#000000' },
+            { n: 'Azul', v: 6, hex: '#0000ff', text: '#ffffff' },
+            { n: 'Violeta', v: 7, hex: '#8a2be2', text: '#ffffff' },
+            { n: 'Gris', v: 8, hex: '#808080', text: '#ffffff' },
+            { n: 'Blanco', v: 9, hex: '#ffffff', text: '#000000' }
+        ];
+
+        function initDropdowns() {
+            const sels = ['sel-b1', 'sel-b2', 'sel-b3'];
+            sels.forEach((id, sIdx) => {
+                const select = document.getElementById(id);
+                colorMap.forEach((c, idx) => {
+                    const opt = document.createElement('option');
+                    opt.value = idx;
+                    opt.textContent = `${c.n} (${sIdx < 2 ? idx : 'x10^'+idx})`;
+                    opt.style.backgroundColor = c.hex;
+                    opt.style.color = c.text;
+                    select.appendChild(opt);
+                });
+            });
+            document.getElementById('sel-b1').value = b1;
+            document.getElementById('sel-b2').value = b2;
+            document.getElementById('sel-b3').value = b3;
+            updateSelectStyles();
+
+            const grid = document.getElementById('color-grid');
+            colorMap.forEach((c, idx) => {
+                const div = document.createElement('div');
+                div.className = 'color-tile';
+                div.style.backgroundColor = c.hex;
+                div.style.color = c.text;
+                div.innerText = idx;
+                grid.appendChild(div);
+            });
+        }
+
+        function updateSelectStyles() {
+            ['sel-b1', 'sel-b2', 'sel-b3'].forEach(id => {
+                const el = document.getElementById(id);
+                const colorObj = colorMap[el.value];
+                el.style.backgroundColor = colorObj.hex;
+                el.style.color = colorObj.text;
+            });
+        }
+
+        function updateBandValues() {
+            b1 = parseInt(document.getElementById('sel-b1').value);
+            b2 = parseInt(document.getElementById('sel-b2').value);
+            b3 = parseInt(document.getElementById('sel-b3').value);
+            updateSelectStyles();
+            calculateResistance();
+            checkExplosion();
+        }
+
+        function calculateResistance() {
+            resistance = (b1 * 10 + b2) * Math.pow(10, b3);
+            if (resistance === 0) resistance = 1; 
+            document.getElementById('vband-1').style.backgroundColor = colorMap[b1].hex;
+            document.getElementById('vband-2').style.backgroundColor = colorMap[b2].hex;
+            document.getElementById('vband-3').style.backgroundColor = colorMap[b3].hex;
+        }
+
+        // FUNCIÓN AÑADIDA PARA DETECTAR LA DESTRUCCIÓN
+        function checkExplosion() {
+            if (voltage >= 600 && resistance <= 1) {
+                document.getElementById('explosion-modal').style.display = 'flex';
+                document.getElementById('ui-layer').style.display = 'none';
+            }
+        }
+
+        function init3D() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+            clock = new THREE.Clock();
+
+            energyGroup = new THREE.Group();
+            scene.add(energyGroup);
+
+            const ambient = new THREE.AmbientLight(0xffffff, 1.2);
+            scene.add(ambient);
+
+            const coreGeo = new THREE.CylinderGeometry(1.5, 1.5, 60, 32, 1, true);
+            coreGeo.rotateZ(Math.PI / 2);
+            coreGeo.translate(25, 0, 0); 
+            const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
+            beamCore = new THREE.Mesh(coreGeo, coreMat);
+            energyGroup.add(beamCore);
+
+            const outerGeo = new THREE.CylinderGeometry(2.8, 2.8, 60, 32, 1, true);
+            outerGeo.rotateZ(Math.PI / 2);
+            outerGeo.translate(25, 0, 0);
+            const outerMat = new THREE.MeshBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.35, wireframe: true });
+            beamOuter = new THREE.Mesh(outerGeo, outerMat);
+            energyGroup.add(beamOuter);
+
+            const chargeGeo = new THREE.SphereGeometry(0.3, 16, 16);
+            for(let i=0; i<150; i++) {
+                const chargeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+                const p = new THREE.Mesh(chargeGeo, chargeMat);
+                resetParticle(p);
+                energyGroup.add(p);
+                particles.push(p);
+            }
+
+            energyGroup.position.set(-13, -7, 0);
+            energyGroup.rotation.z = Math.PI / 7.2; 
+            camera.position.z = 32;
+        }
+
+        function resetParticle(p) {
+            p.position.x = Math.random() * 3;
+            p.position.y = (Math.random() - 0.5) * 4;
+            p.position.z = (Math.random() - 0.5) * 4;
+            p.userData.speedOffset = Math.random() * 0.8;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            const I = voltage / resistance;
+            
+            document.getElementById('val-v').innerText = voltage.toFixed(0);
+            document.getElementById('val-r').innerText = resistance.toLocaleString();
+            document.getElementById('val-i').innerText = I.toFixed(2);
+            
+            const kiBar = document.getElementById('ki-bar');
+            const kiStatus = document.getElementById('ki-status-text');
+            const kiTitle = document.getElementById('ki-monitor-title');
+            const kiPhys = document.getElementById('ki-physics-explanation');
+            
+            kiBar.style.width = Math.min((I/5)*100, 100) + "%";
+
+            // Estados del monitor basados en la intensidad
+            if (I > 4) {
+                kiTitle.innerText = "ENERGÍA AL MÁXIMO";
+                kiTitle.classList.add('text-green-400');
+                kiTitle.classList.remove('text-yellow-400', 'text-red-400');
+                kiStatus.innerText = "SOBRECARGA POSITIVA";
+                kiStatus.style.color = "#4ade80";
+                kiPhys.innerText = "Baja resistencia permite un flujo masivo de electrones impulsados por el voltaje.";
+            } else if (I < 0.5) {
+                kiTitle.innerText = "KI LEVEL MONITOR";
+                kiTitle.classList.add('text-red-400');
+                kiTitle.classList.remove('text-yellow-400', 'text-green-400');
+                kiStatus.innerText = "ENERGÍA DEMASIADO LENTA";
+                kiStatus.style.color = "#f87171";
+                kiPhys.innerText = "La resistencia es tan alta que frena el Ki, impidiendo que la energía fluya con fuerza.";
+            } else {
+                kiTitle.innerText = "KI LEVEL MONITOR";
+                kiTitle.classList.add('text-yellow-400');
+                kiTitle.classList.remove('text-red-400', 'text-green-400');
+                kiStatus.innerText = "FLUJO ESTABLE";
+                kiStatus.style.color = "#22d3ee";
+                kiPhys.innerText = "Equilibrio ideal entre la presión del voltaje y la oposición de la resistencia.";
+            }
+
+            let beamColor = new THREE.Color(0x00aaff); 
+            if (I < 0.8) beamColor.setHex(0xff4400); 
+            if (I > 4) beamColor.setHex(0x00ffaa); 
+            beamOuter.material.color = beamColor;
+            
+            const beamScale = (voltage / 220) + 0.1;
+            beamCore.scale.set(1, beamScale, beamScale);
+            beamOuter.scale.set(1, beamScale * 1.6, beamScale * 1.6);
+
+            particles.forEach(p => {
+                p.position.x += (I * 18 + p.userData.speedOffset) * delta;
+                if(p.position.x > 55) resetParticle(p);
+            });
+
+            beamOuter.rotation.x += 0.1;
+            renderer.render(scene, camera);
+        }
+
+        document.getElementById('v-slider').addEventListener('input', (e) => {
+            voltage = parseFloat(e.target.value);
+            checkExplosion();
+        });
+
+        function showVegeta() {
+            const I = voltage / resistance;
+            const speech = document.getElementById('vegeta-speech');
+            const modal = document.getElementById('vegeta-modal');
+            
+            document.getElementById('res-v').innerText = voltage.toFixed(0);
+            document.getElementById('res-r').innerText = resistance.toLocaleString();
+            document.getElementById('res-i').innerText = I.toFixed(2);
+
+            if(I > 4) {
+                speech.innerHTML = `¡Tsk! ¡Esa <span class="text-green-400 font-bold">INTENSIDAD</span> está fuera de los límites! Has destruido la <span class="text-blue-400 font-bold">RESISTENCIA</span> de este sistema como si fuera un soldado de clase baja.`;
+            } else if (I < 0.5) {
+                speech.innerHTML = `¡¿Qué clase de entrenamiento es este?! La <span class="text-blue-400 font-bold">RESISTENCIA</span> es tan alta que el <span class="text-orange-400 font-bold">VOLTAJE</span> no puede ni mover un poco de Ki. ¡Aumenta la presión!`;
+            } else {
+                speech.innerHTML = `Humph... un flujo de energía equilibrado. Estás aplicando la Ley de Ohm correctamente, guerrero. No dejes que la <span class="text-blue-400 font-bold">RESISTENCIA</span> te detenga.`;
+            }
+            modal.style.display = 'flex';
+        }
+
+        function hideVegeta() { document.getElementById('vegeta-modal').style.display = 'none'; }
+
+        function resetLab() {
+            voltage = 200;
+            document.getElementById('v-slider').value = 200;
+            document.getElementById('sel-b1').value = 1;
+            document.getElementById('sel-b2').value = 0;
+            document.getElementById('sel-b3').value = 1;
+            document.getElementById('explosion-modal').style.display = 'none';
+            document.getElementById('ui-layer').style.display = 'flex';
+            updateBandValues();
+        }
+
+        window.onload = function() {
+            initDropdowns();
+            calculateResistance();
+            init3D();
+            animate();
+        };
+    </script>
+</body>
+</html>
